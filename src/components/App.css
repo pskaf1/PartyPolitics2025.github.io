@@ -1,0 +1,99 @@
+/* Colors */
+:root {
+    --primary-color: #0A1931;
+    --secondary-color: #185ADB;
+    --background-color: #F3F4F6;
+    --text-color: #333333;
+    --heading-color: #0A1931;
+    --button-color: #28A745;
+    --button-hover-color: #218838;
+    --footer-bg-color: #33415C;
+  }
+  
+  /* General Styles */
+  body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+  }
+  
+  h1, h2, h3 {
+    font-family: 'Poppins', sans-serif;
+    color: var(--heading-color);
+    margin-bottom: 10px;
+  }
+  
+  .app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  nav {
+    background-color: var(--primary-color);
+    padding: 10px 0;
+    display: flex;
+    justify-content: center;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1;
+  }
+  
+  nav ul {
+    list-style: none;
+    display: flex;
+    gap: 2rem;
+    padding: 0;
+    margin: 0;
+  }
+  
+  nav ul li a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  nav ul li a:hover {
+    color: var(--secondary-color);
+  }
+  
+  .content {
+    flex: 1;
+    padding: 80px 20px;
+    max-width: 1000px;
+    margin: auto;
+  }
+  
+  button {
+    background-color: var(--button-color);
+    color: white;
+    padding: 10px 20px;
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: var(--button-hover-color);
+  }
+/* Footer in App.css */
+footer {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 20px 0;
+    font-size: 0.9rem;
+  }
+  
+  footer a {
+    color: var(--secondary-color);
+    margin: 0 10px;
+    text-decoration: none;
+  }
+  
+  

@@ -1,0 +1,14 @@
+/* Footer in App.css */
+footer {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 20px 0;
+    font-size: 0.9rem;
+  }
+  
+  footer a {
+    color: var(--secondary-color);
+    margin: 0 10px;
+    text-decoration: none;
+  }
+  
