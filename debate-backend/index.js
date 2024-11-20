@@ -96,6 +96,9 @@ cron.schedule('*/10 * * * *', async () => {
 });
 
 // WebSocket communication for debates
+const roomVotes = {}; // Store vote counts per room
+const userVotes = {}; // Track votes per user per room to prevent multiple votes
+
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
@@ -104,50 +107,51 @@ io.on('connection', (socket) => {
     const { roomId, user } = data;
     socket.join(roomId);
     console.log(`${socket.id} joined room ${roomId} as ${user?.name || 'Unknown'}`);
+    
+    // Initialize vote tracking for the room if not already done
+    if (!roomVotes[roomId]) {
+      roomVotes[roomId] = { for: 0, against: 0 };
+    }
+    if (!userVotes[roomId]) {
+      userVotes[roomId] = {};
+    }
+    
     io.to(roomId).emit('userJoined', { userId: socket.id, name: user?.name || 'Unknown' });
   });
 
   // Handle real-time chat messages
-  socket.on('chatMessage', (data) => {
-    const { roomId, text, user } = data;
-    io.to(roomId).emit('chatMessage', { text, sender: user.name || 'Spectator' });
-    console.log(`Message from ${user.name || 'Spectator'} in room ${roomId}: ${text}`);
-  });
-  
-
-  // Handle voting events
-  let voteCounts = { for: 0, against: 0 };
-socket.on('vote', (data) => {
-  const { roomId, side } = data;
-  if (side === 'for') voteCounts.for += 1;
-  else if (side === 'against') voteCounts.against += 1;
-
-  io.to(roomId).emit('voteUpdate', voteCounts);
+socket.on('chatMessage', (data) => {
+  const { roomId, text, user } = data;
+  if (!user || !user.name) {
+    console.warn("Chat message received without a valid user. Skipping message.");
+    return;
+  }
+  io.to(roomId).emit('chatMessage', { text, sender: user.name });
+  console.log(`Message from ${user.name} in room ${roomId}: ${text}`);
 });
 
-// index.js - Within your WebSocket handling for votes
 
-// Track votes per user in each room
-const userVotes = {}; // Structure: { roomId: { userId: true } }
+  // Handle voting events
+  socket.on('vote', (data) => {
+    const { roomId, side, userId } = data;
 
-io.on('connection', (socket) => {
-  socket.on('vote', ({ roomId, side, userId }) => {
-    // Check if user has already voted
-    if (userVotes[roomId] && userVotes[roomId][userId]) {
-      io.to(socket.id).emit('voteError', { message: 'You have already voted.' });
+    // Check if the user has already voted in this room
+    if (userVotes[roomId][userId]) {
+      socket.emit('voteError', { message: 'You have already voted.' });
       return;
     }
 
-    // Track that the user has voted in this room
-    if (!userVotes[roomId]) userVotes[roomId] = {};
+    // Record that the user has voted
     userVotes[roomId][userId] = true;
 
-    // Increment the vote count
-    const voteCount = side === 'for' ? votes.for++ : votes.against++;
-    io.to(roomId).emit('voteUpdate', { for: votes.for, against: votes.against });
-  });
-});
+    // Increment the vote count based on the side
+    if (side === 'for') roomVotes[roomId].for++;
+    else if (side === 'against') roomVotes[roomId].against++;
 
+    // Emit updated vote counts to all clients in the room
+    io.to(roomId).emit('voteUpdate', roomVotes[roomId]);
+    console.log(`Vote registered in room ${roomId} for ${side}`);
+  });
 
   // Track turns in debate
   socket.on('nextTurn', (data) => {
