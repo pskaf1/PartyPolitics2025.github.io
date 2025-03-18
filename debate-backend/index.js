@@ -16,7 +16,7 @@ const debateRequestRoutes = require("./routes/debateRequest");
 const debateTopicsRoutes = require("./routes/debate-topics");
 const googleAuthRoutes = require("./routes/googleAuth");
 
-const LOCAL_IP = "127.0.0.1"; // Changed to loopback IP for consistency
+const LOCAL_IP = "0.0.0.0"; // Changed to loopback IP for consistency
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/debate-platform";
 
@@ -90,4 +90,4 @@ mongoose
 initWebSocket(io);
 
 // ✅ Start Server
-server.listen(PORT, LOCAL_IP, () => console.log(`✅ Server running on http://${LOCAL_IP}:${PORT}`));
+server.listen(PORT, LOCAL_IP, () => console.log(`✅ Server running on ${PORT}`));
