@@ -10,7 +10,7 @@ const { Server } = require("socket.io");
 
 require("./passportConfig");
 const User = require("./models/User");
-const initWebSocket = require("./utils/websocket");
+const initWebSocket = require("./utils/WebSocket");
 const authRoutes = require("./routes/auth");
 const debateRequestRoutes = require("./routes/debateRequest");
 const debateTopicsRoutes = require("./routes/debate-topics");
