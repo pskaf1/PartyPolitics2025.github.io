@@ -1,17 +1,16 @@
-// models/DebateTopic.js
 const mongoose = require('mongoose');
 
 const DebateTopicSchema = new mongoose.Schema({
-  title: String,
-  description: String,
-  date: { type: Date, required: true },  // Scheduled date and time for the debate
-  status: { type: String, default: "Open for applications" },
+  title: { type: String, required: true },
+  description: { type: String },
+  date: { type: Date, required: true },
+  status: { type: String, default: 'Open for applications' },
   attendanceCount: { type: Number, default: 0 },
-  isLive: { type: Boolean, default: false },  // Indicates if the debate is currently live
+  isLive: { type: Boolean, default: false },
   selectedParticipants: {
     pro: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    con: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
-  }
-});
+    con: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  },
+}, { timestamps: true });
 
 module.exports = mongoose.model('DebateTopic', DebateTopicSchema);

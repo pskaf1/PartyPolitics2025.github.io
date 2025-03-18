@@ -1,26 +1,54 @@
-// utils/sendEmail.js
 const nodemailer = require('nodemailer');
 
+// Transporter configuration
 const transporter = nodemailer.createTransport({
-  service: 'Gmail', // Replace with your email provider
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: true,
   auth: {
-    user: 'your-email@gmail.com',
-    pass: 'your-email-password',
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
-async function sendEmail(to, subject, text) {
+// Email templates
+function generateTemplate(templateName, placeholders = {}) {
+  const templates = {
+    signupConfirmation: `
+      <p>Hi {{firstName}},</p>
+      <p>Thank you for signing up! Please click the link below to verify your email:</p>
+      <a href="{{verificationUrl}}">Verify Email</a>
+      <p>Best regards,<br>World Debate Channel Team</p>
+    `,
+  };
+
+  let template = templates[templateName];
+  if (!template) {
+    throw new Error('Template not found');
+  }
+
+  Object.entries(placeholders).forEach(([key, value]) => {
+    template = template.replace(new RegExp(`{{${key}}}`, 'g'), value);
+  });
+
+  return template;
+}
+
+// Send email function
+async function sendEmail(to, subject, text, html = null) {
   try {
-    await transporter.sendMail({
-      from: '"Debate Platform" <your-email@gmail.com>',
+    const info = await transporter.sendMail({
+      from: `"World Debate Channel" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       text,
+      ...(html && { html }),
     });
-    console.log(`Email sent to ${to}`);
+    console.log(`Email sent: ${info.messageId}`);
   } catch (error) {
-    console.error(`Failed to send email to ${to}:`, error);
+    console.error(`Failed to send email: ${error.message}`);
+    throw new Error('Failed to send email');
   }
 }
 
-module.exports = sendEmail;
+module.exports = { sendEmail, generateTemplate };

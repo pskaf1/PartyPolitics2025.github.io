@@ -1,158 +1,161 @@
-const express = require('express');
-const User = require('../models/User');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const express = require("express");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const rateLimit = require("express-rate-limit");
+const { validationResult } = require("express-validator");
+const User = require("../models/User");
+const { sendEmail, generateTemplate } = require("../utils/sendEmail");
+const { validateSignup, validateLogin } = require("../utils/validators");
+
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+// ✅ Secrets & Configs
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key_here";
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "your_refresh_token_secret_key_here";
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 
-// Sign Up Route
-router.post('/signup', async (req, res) => {
+// ✅ Token Functions
+const generateAccessToken = (userId) => jwt.sign({ userId }, JWT_SECRET, { expiresIn: "15m" });
+const generateRefreshToken = (userId) => jwt.sign({ userId }, REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
+
+// ✅ Login Rate Limiting
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Too many login attempts. Please try again later." },
+});
+
+// ✅ Get Current User
+router.get("/current-user", (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized", message: "No user logged in." });
+  }
+  res.status(200).json(req.user);
+});
+
+// ✅ Signup Route
+router.post("/signup", validateSignup, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
   try {
-    const { firstName, lastName, username, email, password, linkedIn, bio, location, preferredTopics, consentForPublic } = req.body;
+    const { email, password, firstName, lastName, consentForPublic, googleId } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email is already registered' });
+    if (await User.findOne({ email })) {
+      return res.status(400).json({ error: "Conflict", message: "Email already registered." });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
+    const verificationToken = crypto.randomBytes(32).toString("hex");
 
-    const user = new User({
+    const newUser = new User({
       firstName,
       lastName,
-      username,
       email,
       password: hashedPassword,
-      linkedIn,
-      bio,
-      location,
-      preferredTopics,
+      googleId: googleId || null,
       consentForPublic,
+      verificationToken,
+      isVerified: googleId ? true : false, // Auto-verify if signing up with Google
     });
 
-    await user.save();
-    res.status(201).json({ message: 'User created successfully!' });
+    await newUser.save();
+
+    // ✅ If not using Google, send verification email
+    if (!googleId) {
+      const verificationUrl = `${CLIENT_URL}/verify-email/${verificationToken}`;
+      const emailHtml = generateTemplate("signupConfirmation", { firstName, verificationUrl });
+
+      await sendEmail(email, "Verify Your Email", "", emailHtml);
+      return res.status(201).json({ message: "User created! Verify your email." });
+    }
+
+    // ✅ If using Google, log the user in automatically
+    const accessToken = generateAccessToken(newUser._id);
+    const refreshToken = generateRefreshToken(newUser._id);
+
+    res.status(201).json({
+      message: "User created and logged in successfully!",
+      accessToken,
+      refreshToken,
+      user: newUser,
+    });
+
   } catch (error) {
-    console.error('Error creating user:', error);
-    res.status(400).json({ message: 'Error creating user', error: error.message });
+    console.error("❌ Signup Error:", error);
+    res.status(500).json({ error: "Internal Server Error", message: error.message });  
   }
 });
 
-// Log In Route
-router.post('/login', async (req, res) => {
+// ✅ Email Verification - Auto Login After Verification
+// ✅ Email Verification & Auto-login
+router.get("/verify-email/:token", async (req, res) => {
+  try {
+    const user = await User.findOne({ verificationToken: req.params.token });
+
+    if (!user) {
+      return res.status(400).json({ error: "Bad Request", message: "Invalid or expired verification token." });
+    }
+
+    // Mark user as verified
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    await user.save();
+
+    // Generate login tokens
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    // ✅ Send tokens back immediately for auto-login
+    res.status(200).json({
+      message: "Email verified successfully!",
+      accessToken,
+      refreshToken,
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error", message: "Error verifying email." });
+  }
+});
+
+
+// ✅ Login Route
+router.post("/login", loginLimiter, validateLogin, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
+
     if (!user) {
-      return res.status(400).json({ message: 'User not found' });
+      return res.status(400).json({ error: "Unauthorized", message: "User not found." });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+    // ✅ Ensure email is verified before allowing login
+    if (!user.isVerified) {
+      return res.status(403).json({ error: "Forbidden", message: "Email not verified. Please verify your account." });
     }
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
-    res.status(200).json({ message: 'Logged in successfully', token });
+    // ✅ Check password only if user is NOT using Google login
+    if (!user.googleId && !(await bcrypt.compare(password, user.password))) {
+      return res.status(400).json({ error: "Unauthorized", message: "Invalid credentials." });
+    }
+
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    res.status(200).json({
+      message: "Login successful",
+      accessToken,
+      refreshToken,
+      user,
+    });
+
   } catch (error) {
-    console.error('Error logging in:', error);
-    res.status(500).json({ message: 'Error logging in', error: error.message });
-  }
-});
-
-// Protected Route: Get Profile
-router.get('/profile', async (req, res) => {
-  try {
-    const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-password');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.status(200).json(user);
-  } catch (error) {
-    console.error('Unauthorized access error:', error);
-    res.status(401).json({ message: 'Unauthorized access', error: error.message });
-  }
-});
-
-// Protected Route: Update Profile
-router.post('/profile/update', async (req, res) => {
-  try {
-    const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const userId = decoded.userId;
-
-    const { firstName, lastName, username, linkedIn, bio, location, preferredTopics } = req.body;
-
-    const updatedData = {
-      firstName,
-      lastName,
-      username,
-      linkedIn,
-      bio,
-      location,
-      preferredTopics: Array.isArray(preferredTopics) ? preferredTopics : [preferredTopics],
-    };
-
-    // Remove undefined fields to avoid overwriting existing data with undefined
-    Object.keys(updatedData).forEach(key => updatedData[key] === undefined && delete updatedData[key]);
-
-    const updatedUser = await User.findByIdAndUpdate(userId, updatedData, { new: true }).select('-password');
-    if (!updatedUser) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.status(200).json({ message: 'Profile updated successfully!', user: updatedUser });
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    res.status(500).json({ message: 'Error updating profile', error: error.message });
-  }
-});
-
-// Protected Route: Change Password
-router.post('/profile/change-password', async (req, res) => {
-  try {
-    const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const userId = decoded.userId;
-
-    const { currentPassword, newPassword } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Check if the current password is correct
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Current password is incorrect' });
-    }
-
-    // Hash the new password and update
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
-
-    res.status(200).json({ message: 'Password changed successfully!' });
-  } catch (error) {
-    console.error('Error changing password:', error);
-    res.status(500).json({ message: 'Error changing password', error: error.message });
+    console.error("❌ Login Error:", error);
+    res.status(500).json({ error: "Internal Server Error", message: "Error logging in." });
   }
 });
 
