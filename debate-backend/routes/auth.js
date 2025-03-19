@@ -13,7 +13,8 @@ const router = express.Router();
 // ✅ Secrets & Configs
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key_here";
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "your_refresh_token_secret_key_here";
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+const CLIENT_URL = process.env.CLIENT_URL || "https://your-frontend.onrender.com"; // Update this to your frontend URL
+const BACKEND_URL = process.env.BACKEND_URL || "https://your-backend.onrender.com"; // Update this to your backend URL
 
 // ✅ Token Functions
 const generateAccessToken = (userId) => jwt.sign({ userId }, JWT_SECRET, { expiresIn: "15m" });
@@ -43,7 +44,7 @@ router.post("/signup", validateSignup, async (req, res) => {
     const { email, password, firstName, lastName, consentForPublic, googleId } = req.body;
 
     if (await User.findOne({ email })) {
-      return res.status(400).json({ error: "Conflict", message: "Email already registered." });
+      return res.status(409).json({ error: "Conflict", message: "Email already registered." });
     }
 
     const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
@@ -89,7 +90,6 @@ router.post("/signup", validateSignup, async (req, res) => {
 });
 
 // ✅ Email Verification - Auto Login After Verification
-// ✅ Email Verification & Auto-login
 router.get("/verify-email/:token", async (req, res) => {
   try {
     const user = await User.findOne({ verificationToken: req.params.token });
@@ -118,7 +118,6 @@ router.get("/verify-email/:token", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error", message: "Error verifying email." });
   }
 });
-
 
 // ✅ Login Route
 router.post("/login", loginLimiter, validateLogin, async (req, res) => {
@@ -156,6 +155,35 @@ router.post("/login", loginLimiter, validateLogin, async (req, res) => {
   } catch (error) {
     console.error("❌ Login Error:", error);
     res.status(500).json({ error: "Internal Server Error", message: "Error logging in." });
+  }
+});
+
+// ✅ Google Authentication Redirect
+router.get("/google", (req, res) => {
+  res.redirect(`${BACKEND_URL}/auth/google`);
+});
+
+// ✅ Google Authentication Callback
+router.get("/google/callback", async (req, res) => {
+  try {
+    const user = await User.findOne({ googleId: req.query.id });
+
+    if (!user) {
+      return res.status(400).json({ error: "Unauthorized", message: "Google user not found." });
+    }
+
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    res.status(200).json({
+      message: "Google login successful",
+      accessToken,
+      refreshToken,
+      user,
+    });
+  } catch (error) {
+    console.error("❌ Google Login Error:", error);
+    res.status(500).json({ error: "Internal Server Error", message: "Error logging in with Google." });
   }
 });
 
