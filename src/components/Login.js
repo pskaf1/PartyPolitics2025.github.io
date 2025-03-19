@@ -5,39 +5,30 @@ import { toast } from 'react-toastify';
 import './Login.css';
 
 function Login() {
-  const { login } = useAuth(); // Import the login function from AuthContext
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [error, setError] = useState(null); // State to manage login errors
+  const { login } = useAuth(); // ✅ Now using the login function from AuthContext
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get the path the user was originally trying to access, or default to "/"
-  const redirectPath = location.state?.from?.pathname || '/';
+  // If redirected after authentication failure, send back to intended page
+  const redirectPath = location.state?.from?.pathname || '/debate-topics';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null); // Reset error state on new submit
+    setError(null);
 
     try {
-      // Call the login function from AuthContext and pass the email, password, and redirect path
       const success = await login(formData.email, formData.password, redirectPath);
-
       if (success) {
         toast.success("Logged in successfully!");
-        navigate(redirectPath); // Redirect after successful login
       } else {
-        setError("Login failed. Please try again."); // Set error message if login fails
+        setError("Login failed. Please try again.");
         toast.error("Login failed. Please try again.");
       }
     } catch (error) {
@@ -54,22 +45,10 @@ function Login() {
         {error && <p className="error-message">{error}</p>}
         <form onSubmit={handleSubmit}>
           <div className="login-form-row">
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              required
-              onChange={handleChange}
-            />
+            <input type="email" name="email" placeholder="Email" required onChange={handleChange} />
           </div>
           <div className="login-form-row">
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              required
-              onChange={handleChange}
-            />
+            <input type="password" name="password" placeholder="Password" required onChange={handleChange} />
           </div>
           <button type="submit">Log In</button>
         </form>

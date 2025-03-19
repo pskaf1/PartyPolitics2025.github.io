@@ -1,6 +1,5 @@
-// src/components/DebateRoom.js
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -10,42 +9,36 @@ import './DebateRoom.css';
 const socket = io('http://localhost:3001');
 
 function DebateRoom({ userRole }) {
-  const { user } = useAuth();
+  const { user, loading, fetchSessionUser } = useAuth();
   const { roomId } = useParams();
-  const [stream, setStream] = useState(null);
-  const myVideo = useRef(null);
-  const [message, setMessage] = useState("");
+  const navigate = useNavigate();
+  const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [votes, setVotes] = useState({ for: 0, against: 0 });
   const [hasVoted, setHasVoted] = useState(false);
-  const [turn, setTurn] = useState("participant1");
+  const [viewerCount, setViewerCount] = useState(0);
+  const myVideo = useRef(null);
+  const opponentVideo = useRef(null);
+  const mediaStreamRef = useRef(null);
 
   useEffect(() => {
-    console.log("User data on component load:", user);
+    if (loading) return;
 
-    const getMedia = async () => {
-      if (userRole === 'participant') {
-        try {
-          const mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "user" },
-            audio: true,
-          });
-          setStream(mediaStream);
-          if (myVideo.current) {
-            myVideo.current.srcObject = mediaStream;
-          }
-        } catch (error) {
-          console.error('Media access error:', error);
-        }
-      }
-    };
+    if (!user) {
+      console.warn("❌ No user detected, fetching session user...");
+      fetchSessionUser();
+      return;
+    }
 
-    getMedia();
+    if (!roomId) {
+      console.error("❌ `roomId` is missing! Redirecting to topics.");
+      navigate('/debate-topics');
+      return;
+    }
 
-    // Join room with user data
-    socket.emit('joinRoom', { roomId, userRole, user });
+    console.log(`✅ Joining room: ${roomId} as ${user.firstName}`);
+    socket.emit('joinRoom', { roomId, user });
 
-    // Socket listeners
     socket.on('chatMessage', (data) => {
       setMessages((prevMessages) => [...prevMessages, data]);
     });
@@ -54,82 +47,95 @@ function DebateRoom({ userRole }) {
       setVotes(updatedVotes);
     });
 
-    socket.on('updateTurn', (newTurn) => {
-      setTurn(newTurn);
+    socket.on('viewerCountUpdate', (count) => {
+      setViewerCount(count);
     });
 
-    // Cleanup on component unmount
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      console.log(`🔄 Cleaning up socket events for room: ${roomId}`);
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
       }
-      socket.off('joinRoom');
       socket.off('chatMessage');
       socket.off('voteUpdate');
-      socket.off('updateTurn');
+      socket.off('viewerCountUpdate');
     };
-  }, [roomId, userRole, stream, user]);
+  }, [roomId, user, loading, fetchSessionUser, navigate]);
 
   const handleSendMessage = () => {
-    if (!user || !user.name) {
-      toast.warn("Please log in to send messages.");
+    if (!user || !user.firstName) {
+      toast.warn('Please log in to send messages.');
       return;
     }
+    if (!roomId) return;
+
     if (message.trim()) {
-      socket.emit("chatMessage", {
+      socket.emit('chatMessage', {
         roomId,
         text: message,
-        user, // Pass full user object to ensure backend access to name
+        user: { _id: user._id, firstName: user.firstName },
       });
-      setMessage("");
+      setMessage('');
+    } else {
+      toast.warn('Message cannot be empty.');
     }
   };
 
   const handleVote = (side) => {
     if (!user || !user._id) {
-      toast.warn("Please log in to vote.");
+      toast.warn('Please log in to vote.');
       return;
     }
     if (hasVoted) {
-      toast.warn("You can only vote once.");
+      toast.warn('You can only vote once.');
       return;
     }
+    if (!roomId) return;
+
     socket.emit('vote', { roomId, side, userId: user._id });
     setHasVoted(true);
   };
 
-  const handleNextTurn = () => {
-    const nextTurn = turn === 'participant1' ? 'participant2' : 'participant1';
-    socket.emit('nextTurn', { roomId, turn: nextTurn });
-    setTurn(nextTurn);
-  };
+  if (loading) return <div>Loading...</div>;
 
   return (
-    <div className="debate-room-container">
-      <div className="video-section">
-        {userRole === 'participant' ? (
-          <video ref={myVideo} playsInline autoPlay muted className="video-box" />
-        ) : (
-          <p className="observer-label">Observer mode: Watching the debate</p>
-        )}
+    <div className="debate-room">
+      <div className="header">
+        <h1>
+          <span className="live-dot"></span> Live Debate Room
+          <span className="viewer-count">{viewerCount} Viewers Watching Now</span>
+        </h1>
+      </div>
+
+      <div className="debate-stage-container">
+        <div className="debate-stage">
+          <div className="video-container">
+            <video ref={myVideo} playsInline autoPlay muted className="video-box" />
+            <div className="participant-label">Participant 1</div>
+          </div>
+          <div className="video-container">
+            <video ref={opponentVideo} playsInline autoPlay className="video-box" />
+            <div className="participant-label">Participant 2</div>
+          </div>
+        </div>
       </div>
 
       <div className="voting-section">
-        <h3>Vote for the debate:</h3>
-        <button onClick={() => handleVote('for')} className="vote-button" disabled={hasVoted}>Vote For</button>
-        <button onClick={() => handleVote('against')} className="vote-button" disabled={hasVoted}>Vote Against</button>
-        <p>For: {votes.for} | Against: {votes.against}</p>
+        <h3>Who do you agree with more?</h3>
+        <div className="vote-buttons">
+          <button onClick={() => handleVote('for')} className="vote-button" disabled={hasVoted}>
+            Participant 1
+          </button>
+          <button onClick={() => handleVote('against')} className="vote-button" disabled={hasVoted}>
+            Participant 2
+          </button>
+        </div>
+        <p>Participant 1: {votes.for} | Participant 2: {votes.against}</p>
       </div>
 
-      {userRole === 'participant' && (
-        <div className="turn-section">
-          <p>Current Turn: {turn === 'participant1' ? 'Participant 1' : 'Participant 2'}</p>
-          <button onClick={handleNextTurn} className="next-turn-button">End Turn</button>
-        </div>
-      )}
-
-      <div className="chat-container">
-        <h2>Chat</h2>
+      <div className="chat-section">
+        <h3>Live Chat</h3>
         <div className="chat-messages">
           {messages.map((msg, index) => (
             <div key={index} className="chat-message">
@@ -144,7 +150,9 @@ function DebateRoom({ userRole }) {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
           />
-          <button className="send-button" onClick={handleSendMessage}>→</button>
+          <button className="send-button" onClick={handleSendMessage}>
+            →
+          </button>
         </div>
       </div>
     </div>

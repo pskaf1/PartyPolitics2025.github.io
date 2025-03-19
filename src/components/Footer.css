@@ -1,14 +1,58 @@
-/* Footer in App.css */
-footer {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 20px 0;
-    font-size: 0.9rem;
-  }
-  
-  footer a {
-    color: var(--secondary-color);
-    margin: 0 10px;
-    text-decoration: none;
-  }
-  
+/* Footer Styles */
+.footer {
+  background-color: #185ADB; /* Deep blue matching the header and Landing Page */
+  color: #FFFFFF; /* White text for contrast */
+  padding: 20px 10px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.footer-logo h3 {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #FFFFFF; /* Matches footer text */
+}
+
+.footer-links {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.footer-links a {
+  color: #FFFFFF; /* White for links */
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.footer-links a:hover {
+  text-decoration: underline;
+  color: #90CAF9; /* Soft blue hover effect */
+}
+
+.footer-social {
+  display: flex;
+  gap: 15px;
+}
+
+.footer-social a {
+  color: #FFFFFF; /* White for icons */
+  font-size: 1.2rem;
+}
+
+.footer-social a:hover {
+  color: #90CAF9; /* Soft blue for hover effect */
+}
+
+.footer-bottom {
+  margin-top: 15px;
+  font-size: 0.8rem;
+  color: #F3F7FC; /* Lighter blue for subtle contrast */
+}

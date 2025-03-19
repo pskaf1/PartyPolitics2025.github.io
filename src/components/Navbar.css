@@ -1,5 +1,5 @@
 .navbar {
-    background-color: #0A1931;
+    background-color: #185ADB; /* Matches the main accent color of the Landing Page */
     padding: 10px 20px;
     color: white;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -14,7 +14,7 @@
 .logo {
     font-family: 'Poppins', sans-serif;
     font-size: 1.5rem;
-    color: #185ADB;
+    color: white; /* White for logo text */
     font-weight: bold;
 }
 
@@ -30,19 +30,19 @@
 }
 
 .nav-links a {
-    color: white;
+    color: white; /* White for links */
     font-weight: 500;
     transition: color 0.3s ease;
 }
 
 .nav-links a:hover {
-    color: #28A745;
+    color: #90CAF9; /* Lighter blue for hover effect */
 }
 
 /* Profile Icon Styling */
 .profile-icon {
     font-size: 1.3rem;
-    color: #185ADB;
+    color: white; /* Matches navbar links */
     cursor: pointer;
 }
 
@@ -56,21 +56,21 @@
 
 .dropdown-menu {
     position: absolute;
-    top: calc(100% + 8px); /* Ensures dropdown appears below the navbar */
+    top: calc(100% + 8px);
     right: 0;
-    background-color: #1e222a;
+    background-color: #FFFFFF; /* White for a clean dropdown menu */
     border-radius: 4px;
     box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
     padding: 5px 0;
-    min-width: 120px;
-    z-index: 1000; /* Ensures dropdown is above other content */
+    min-width: 140px;
+    z-index: 1000;
 }
 
 .dropdown-item {
     padding: 6px 14px;
-    color: #ddd;
+    color: #185ADB; /* Matches the navbar color scheme */
     font-size: 0.9rem;
     text-align: left;
     text-decoration: none;
@@ -80,8 +80,8 @@
 }
 
 .dropdown-item:hover {
-    background-color: #2b2f3a;
-    color: #c0c0c0;
+    background-color: #F3F7FC; /* Light silver-blue for hover effect */
+    color: #185ADB; /* Matches the theme */
 }
 
 /* Dropdown item styling for buttons (if needed) */
