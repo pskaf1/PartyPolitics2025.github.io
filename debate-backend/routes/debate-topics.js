@@ -1,11 +1,11 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const DebateTopic = require('../models/DebateTopic');
+const DebateTopic = require("../models/DebateTopic");
 
 // ✅ Fetch all debate topics
-router.get('/', async (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    const topics = await DebateTopic.find({}, 'title description date status attendanceCount isLive');
+    const topics = await DebateTopic.find({}, "title description date status attendanceCount isLive");
     res.json(topics);
   } catch (error) {
     console.error("❌ Error fetching topics:", error);
@@ -13,8 +13,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ✅ Create a new debate topic (Fix for 404 Not Found)
-router.post('/create', async (req, res) => {
+// ✅ Create a new debate topic
+router.post("/create", async (req, res) => {
   const { title, description, scheduledDateTime } = req.body;
 
   if (!title || !description || !scheduledDateTime) {
@@ -40,7 +40,7 @@ router.post('/create', async (req, res) => {
 });
 
 // ✅ Mark Attendance
-router.post('/:topicId/attend', async (req, res) => {
+router.post("/:topicId/attend", async (req, res) => {
   const { topicId } = req.params;
   if (!topicId || topicId.length !== 24) {
     return res.status(400).json({ message: "Invalid topic ID." });
